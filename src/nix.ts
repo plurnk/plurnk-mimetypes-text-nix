@@ -172,3 +172,33 @@ function push(out: MimeSymbol[], kind: SymbolKind, name: string, node: TreeSitte
         endLine: node.endPosition.row + 1,
     });
 }
+
+// References query for tree-sitter-nix (SPEC §16). Nix is functional/
+// declarative; only two edge kinds are honest here — precision over recall, so
+// bare variable reads are NOT emitted (`use` is reserved for structural refs).
+//
+//   apply_expression → call (function application). Two shapes:
+//     - `helper x`        function: (variable_expression) → the callee name;
+//                         resolves to a local let/attrset binding.
+//     - `pkgs.foo x`      function: (select_expression) → the trailing attrpath
+//                         identifier (member call). Like Swift member calls and
+//                         Go imports, these often name a foreign attr that has
+//                         no local def — acceptable dead rows.
+//   inherit / inherit_from → use. `inherit greeting;` and `inherit (lib) a b;`
+//                         name existing bindings/attrs — structural references.
+//
+// Nested application (`f a b` = apply(apply(f, a), b)) still yields one call
+// edge: only the innermost apply carries a `variable_expression`/`select_
+// expression` function child, so the callee is captured exactly once.
+export const refsQuery = `
+(apply_expression
+  function: (variable_expression (identifier) @ref.call))
+
+(apply_expression
+  function: (select_expression
+    attrpath: (attrpath (identifier) @ref.call .)))
+
+(inherit (inherited_attrs (identifier) @ref.use))
+
+(inherit_from (inherited_attrs (identifier) @ref.use))
+`;

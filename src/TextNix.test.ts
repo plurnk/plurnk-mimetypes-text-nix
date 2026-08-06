@@ -128,3 +128,22 @@ describe("TextNix — deep-json channel", () => {
         assert.ok(Array.isArray(tree.children));
     });
 });
+
+describe("TextNix — parser coordinates", () => {
+    it("materializes Unicode spans across LF, CRLF, and CR boundaries", async () => {
+        const firstLine = "{ a = \"😀e\u0301\";";
+        for (const separator of ["\n", "\r\n", "\r"]) {
+            const symbols = await h().extractRaw(`${firstLine}${separator}b = 1; }`);
+            const first = symbols.find((symbol) => symbol.name === "a");
+            const second = symbols.find((symbol) => symbol.name === "b");
+            assert.deepEqual(first && {
+                line: first.line,
+                column: first.column,
+                endLine: first.endLine,
+                endColumn: first.endColumn,
+            }, { line: 1, column: 3, endLine: 1, endColumn: Array.from(firstLine).length + 1 });
+            assert.equal(second?.line, 2);
+            assert.equal(second?.column, 1);
+        }
+    });
+});

@@ -1,4 +1,5 @@
-import type { MimeSymbol, SymbolKind, TreeSitterNode } from "@plurnk/plurnk-mimetypes";
+import { treeSitterSpan } from "@plurnk/plurnk-mimetypes";
+import type { SymbolKind, TreeSitterNode, TreeSitterSymbolProjection } from "@plurnk/plurnk-mimetypes";
 
 // Nix SPEC §3 mapping for tree-sitter-nix.
 //
@@ -16,14 +17,14 @@ import type { MimeSymbol, SymbolKind, TreeSitterNode } from "@plurnk/plurnk-mime
 // For function-wrapper files (`{ stdenv, lib }: stdenv.mkDerivation ...`),
 // we descend into the body. Same for let-expressions: emit let bindings,
 // then recurse into the `in` body.
-export function extract(root: TreeSitterNode): MimeSymbol[] {
-    const out: MimeSymbol[] = [];
+export function extract(root: TreeSitterNode): TreeSitterSymbolProjection[] {
+    const out: TreeSitterSymbolProjection[] = [];
     const expr = root.childForFieldName("expression");
     if (expr) walkExpression(expr, out);
     return out;
 }
 
-function walkExpression(node: TreeSitterNode, out: MimeSymbol[]): void {
+function walkExpression(node: TreeSitterNode, out: TreeSitterSymbolProjection[]): void {
     switch (node.type) {
         case "attrset_expression":
         case "rec_attrset_expression": {
@@ -58,7 +59,7 @@ function walkExpression(node: TreeSitterNode, out: MimeSymbol[]): void {
     }
 }
 
-function emitBindings(bindingSet: TreeSitterNode, out: MimeSymbol[]): void {
+function emitBindings(bindingSet: TreeSitterNode, out: TreeSitterSymbolProjection[]): void {
     for (let i = 0; i < bindingSet.namedChildCount; i += 1) {
         const child = bindingSet.namedChild(i);
         if (!child) continue;
@@ -79,7 +80,7 @@ function emitBindings(bindingSet: TreeSitterNode, out: MimeSymbol[]): void {
     }
 }
 
-function emitBinding(binding: TreeSitterNode, out: MimeSymbol[]): void {
+function emitBinding(binding: TreeSitterNode, out: TreeSitterSymbolProjection[]): void {
     const attrpath = binding.childForFieldName("attrpath");
     const expr = binding.childForFieldName("expression");
     if (!attrpath) return;
@@ -94,8 +95,7 @@ function emitBinding(binding: TreeSitterNode, out: MimeSymbol[]): void {
         out.push({
             name,
             kind,
-            line: binding.startPosition.row + 1,
-            endLine: binding.endPosition.row + 1,
+            span: treeSitterSpan(binding),
             params: extractFunctionParams(expr),
         });
     } else {
@@ -164,12 +164,11 @@ function isScreamingSnake(name: string): boolean {
     return hasLetter;
 }
 
-function push(out: MimeSymbol[], kind: SymbolKind, name: string, node: TreeSitterNode): void {
+function push(out: TreeSitterSymbolProjection[], kind: SymbolKind, name: string, node: TreeSitterNode): void {
     out.push({
         name,
         kind,
-        line: node.startPosition.row + 1,
-        endLine: node.endPosition.row + 1,
+        span: treeSitterSpan(node),
     });
 }
 

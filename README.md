@@ -19,3 +19,8 @@ Three channels per the framework's #10 contract: symbols (above), deep-json (inh
 ## license
 
 MIT.
+
+## Versioning
+
+This package versions independently. Compatibility is declared by its dependency
+ranges; a Plurnk release does not require a release of this package.
